@@ -3,8 +3,9 @@
 [English](README.md) | **中文**
 
 一个用于3D模型生成的跨平台（Windows/Mac/Web）最小化应用程序。基于Tripo3D API、React、TypeScript、Three.js和Electron构建。
+（周末约6小时 Cursor + Claude4 vibe coding实现）
 
-> 在Tripo注册即可获得300个免费API积分，值得一试！
+> 在Tripo注册即可获得300个免费API积分(与网页版积分不同），值得一试！
 
 ![演示](./assets/demo.gif)
 

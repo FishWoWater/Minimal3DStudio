@@ -3,8 +3,9 @@
 **English** | [中文](README_zh.md)
 
 A minimal cross-platform(Win/Mac/Web) application for 3D model generation. Built with Tripo3D API, React, TypeScript, Three.js, and Electron.
+(~6 hours of vibe coding using Cursor + Claude4 in the weekend)
 
-> You can get 300 free API credits upon registration on Tripo so it worths a try!
+> You can get 300 free API credits(separated from 300 web credits) upon registration on Tripo so it worths a try!
 
 ![Demo](./assets/demo.gif)
 
@@ -140,5 +141,5 @@ This project is licensed under the Apache2.0 License - see the [LICENSE](LICENSE
 - [Tripo3D](https://platform.tripo3d.ai) for the powerful 3D generation API
 - [React Three Fiber](https://github.com/pmndrs/react-three-fiber) for 3D rendering
 - [Lucide](https://lucide.dev) for beautiful icons
-- Cursor + Claude4
+- Cursor + Claude4 
 
