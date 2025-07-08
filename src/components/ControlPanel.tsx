@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { Sparkles, Download, Zap, AlertCircle, Info } from 'lucide-react';
-import { GenerationParameters, TaskStatus } from '../types/api';
+import { GenerationParameters, TaskStatus, APIProvider } from '../types/api';
 
 interface ControlPanelProps {
   textPrompt: string;
@@ -16,6 +16,7 @@ interface ControlPanelProps {
   hasModel: boolean;
   error: string | null;
   onClearError: () => void;
+  apiProvider: APIProvider;
 }
 
 const CREDIT_COSTS = {
@@ -42,6 +43,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   hasModel,
   error,
   onClearError,
+  apiProvider,
 }) => {
   const handleParameterToggle = useCallback((parameter: keyof GenerationParameters) => {
     onParametersChange({
@@ -51,6 +53,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   }, [parameters, onParametersChange]);
 
   const calculateTotalCost = useCallback(() => {
+    // For Replicate, we don't show credit costs
+    if (apiProvider === 'replicate') {
+      return 0;
+    }
+
     let cost = CREDIT_COSTS.base;
     
     // Handle parameter constraints: if generate_parts is true, texture will be forced to false
@@ -68,7 +75,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     if (effectiveQuad) cost += CREDIT_COSTS.quadTopology;
     
     return cost;
-  }, [parameters]);
+  }, [parameters, apiProvider]);
 
   const getStatusText = () => {
     if (error) return '';
@@ -106,8 +113,135 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     return currentTask?.progress || 0;
   };
 
-  const hasParameterConstraints = (parameters.generate_parts && (parameters.texture || parameters.quad)) || 
-                                  (parameters.pbr && parameters.texture);
+  const hasParameterConstraints = apiProvider === 'tripo' && (
+    (parameters.generate_parts && (parameters.texture || parameters.quad)) || 
+    (parameters.pbr && parameters.texture)
+  );
+
+  const renderTripoParameters = () => (
+    <>
+      <div 
+        className={`parameter-btn ${parameters.texture ? 'active' : ''} ${parameters.generate_parts ? 'disabled' : ''}`}
+        onClick={() => !parameters.generate_parts && handleParameterToggle('texture')}
+      >
+        <span>Generate Texture</span>
+        <span className="credit-cost">+{CREDIT_COSTS.texture}</span>
+        <div className="tooltip">
+          Adds realistic texture to the model (+{CREDIT_COSTS.texture} credits)
+        </div>
+      </div>
+
+      <div 
+        className={`parameter-btn ${parameters.pbr ? 'active' : ''}`}
+        onClick={() => handleParameterToggle('pbr')}
+      >
+        <span>PBR</span>
+        <span className="credit-cost">+{CREDIT_COSTS.pbr}</span>
+        <div className="tooltip">
+          Physically Based Rendering texture with advanced materials (+{CREDIT_COSTS.pbr} credits)
+        </div>
+      </div>
+      
+      <div 
+        className={`parameter-btn ${parameters.texture_quality === 'detailed' ? 'active' : ''}`}
+        onClick={() => onParametersChange({
+          ...parameters,
+          texture_quality: parameters.texture_quality === 'detailed' ? 'standard' : 'detailed'
+        })}
+      >
+        <span>HD Texture</span>
+        <span className="credit-cost">+{CREDIT_COSTS.textureQuality}</span>
+        <div className="tooltip">
+          High-definition texture quality (+{CREDIT_COSTS.textureQuality} credits)
+        </div>
+      </div>
+      
+      <div 
+        className={`parameter-btn ${parameters.generate_parts ? 'active' : ''}`}
+        onClick={() => handleParameterToggle('generate_parts')}
+      >
+        <span>Generate In Parts</span>
+        <span className="credit-cost">+{CREDIT_COSTS.generateParts}</span>
+        <div className="tooltip">
+          Creates model with separate components (+{CREDIT_COSTS.generateParts} credits)
+        </div>
+      </div>
+      
+      <div 
+        className={`parameter-btn ${parameters.smart_low_poly ? 'active' : ''}`}
+        onClick={() => handleParameterToggle('smart_low_poly')}
+      >
+        <span>Low Poly</span>
+        <span className="credit-cost">+{CREDIT_COSTS.smartLowPoly}</span>
+        <div className="tooltip">
+          Optimized geometry for gaming/AR (+{CREDIT_COSTS.smartLowPoly} credit)
+        </div>
+      </div>
+      
+      <div 
+        className={`parameter-btn ${parameters.quad ? 'active' : ''} ${parameters.generate_parts ? 'disabled' : ''}`}
+        onClick={() => !parameters.generate_parts && handleParameterToggle('quad')}
+      >
+        <span>Quad</span>
+        <span className="credit-cost">+{CREDIT_COSTS.quadTopology}</span>
+        <div className="tooltip">
+          Clean quad-based mesh topology (+{CREDIT_COSTS.quadTopology} credits)
+        </div>
+      </div>
+    </>
+  );
+
+  const renderReplicateParameters = () => (
+    <>
+      <div className="parameter-group">
+        <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          Texture Size: {parameters.texture_size || 1024}px
+        </label>
+        <input
+          type="range"
+          min="512"
+          max="2048"
+          step="256"
+          value={parameters.texture_size || 1024}
+          onChange={(e) => onParametersChange({
+            ...parameters,
+            texture_size: parseInt(e.target.value, 10)
+          })}
+          disabled={isGenerating}
+          className="slider"
+        />
+        <div className="slider-labels">
+          <span>512</span>
+          <span>1024</span>
+          <span>2048</span>
+        </div>
+      </div>
+
+      <div className="parameter-group">
+        <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          Mesh Simplify: {((parameters.mesh_simplify || 0.9) * 100).toFixed(0)}%
+        </label>
+        <input
+          type="range"
+          min="0.5"
+          max="0.95"
+          step="0.05"
+          value={parameters.mesh_simplify || 0.9}
+          onChange={(e) => onParametersChange({
+            ...parameters,
+            mesh_simplify: parseFloat(e.target.value)
+          })}
+          disabled={isGenerating}
+          className="slider"
+        />
+        <div className="slider-labels">
+          <span>50%</span>
+          <span>70%</span>
+          <span>95%</span>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="control-panel">
@@ -187,118 +321,60 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       <div className="parameters-section">
         <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-          Advanced Parameters
+          Advanced Parameters ({apiProvider === 'tripo' ? 'Tripo3D' : 'Replicate'})
         </h3>
         
-        <div className="parameters-grid">
-          <div 
-            className={`parameter-btn ${parameters.texture ? 'active' : ''} ${parameters.generate_parts ? 'disabled' : ''}`}
-            onClick={() => !parameters.generate_parts && handleParameterToggle('texture')}
-          >
-            <span>Generate Texture</span>
-            <span className="credit-cost">+{CREDIT_COSTS.texture}</span>
-            <div className="tooltip">
-              Adds realistic texture to the model (+{CREDIT_COSTS.texture} credits)
+        {apiProvider === 'tripo' ? (
+          <>
+            <div className="parameters-grid">
+              {renderTripoParameters()}
+            </div>
+            
+            <div className="input-group" style={{ marginTop: '0.5rem' }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Face Limit: {parameters.face_limit ? parameters.face_limit.toLocaleString() : 'Auto'}
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="range"
+                  min="1000"
+                  max="100000"
+                  step="1000"
+                  value={parameters.face_limit || 10000}
+                  onChange={(e) => onParametersChange({
+                    ...parameters,
+                    face_limit: parseInt(e.target.value, 10)
+                  })}
+                  disabled={isGenerating}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  className="btn-icon"
+                  onClick={() => onParametersChange({
+                    ...parameters,
+                    face_limit: undefined
+                  })}
+                  disabled={isGenerating}
+                  style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
+                  title="Reset to Auto"
+                >
+                  Auto
+                </button>
+              </div>
+            </div>
+            
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              Base generation: {CREDIT_COSTS.base} credits • Selected options: +{calculateTotalCost() - CREDIT_COSTS.base} credits
+            </div>
+          </>
+        ) : (
+          <div className="replicate-parameters">
+            {renderReplicateParameters()}
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              Replicate API - pay per generation(around $0.01 per text2image and $0.04 per image2model)
             </div>
           </div>
-
-          <div 
-            className={`parameter-btn ${parameters.pbr ? 'active' : ''}`}
-            onClick={() => handleParameterToggle('pbr')}
-          >
-            <span>PBR</span>
-            <span className="credit-cost">+{CREDIT_COSTS.pbr}</span>
-            <div className="tooltip">
-              Physically Based Rendering texture with advanced materials (+{CREDIT_COSTS.pbr} credits)
-            </div>
-          </div>
-          
-          <div 
-            className={`parameter-btn ${parameters.texture_quality === 'detailed' ? 'active' : ''}`}
-            onClick={() => onParametersChange({
-              ...parameters,
-              texture_quality: parameters.texture_quality === 'detailed' ? 'standard' : 'detailed'
-            })}
-          >
-            <span>HD Texture</span>
-            <span className="credit-cost">+{CREDIT_COSTS.textureQuality}</span>
-            <div className="tooltip">
-              High-definition texture quality (+{CREDIT_COSTS.textureQuality} credits)
-            </div>
-          </div>
-          
-          <div 
-            className={`parameter-btn ${parameters.generate_parts ? 'active' : ''}`}
-            onClick={() => handleParameterToggle('generate_parts')}
-          >
-            <span>Generate In Parts</span>
-            <span className="credit-cost">+{CREDIT_COSTS.generateParts}</span>
-            <div className="tooltip">
-              Creates model with separate components (+{CREDIT_COSTS.generateParts} credits)
-            </div>
-          </div>
-          
-          <div 
-            className={`parameter-btn ${parameters.smart_low_poly ? 'active' : ''}`}
-            onClick={() => handleParameterToggle('smart_low_poly')}
-          >
-            <span>Low Poly</span>
-            <span className="credit-cost">+{CREDIT_COSTS.smartLowPoly}</span>
-            <div className="tooltip">
-              Optimized geometry for gaming/AR (+{CREDIT_COSTS.smartLowPoly} credit)
-            </div>
-          </div>
-          
-          <div 
-            className={`parameter-btn ${parameters.quad ? 'active' : ''} ${parameters.generate_parts ? 'disabled' : ''}`}
-            onClick={() => !parameters.generate_parts && handleParameterToggle('quad')}
-          >
-            <span>Quad</span>
-            <span className="credit-cost">+{CREDIT_COSTS.quadTopology}</span>
-            <div className="tooltip">
-              Clean quad-based mesh topology (+{CREDIT_COSTS.quadTopology} credits)
-            </div>
-          </div>
-          
-  
-        </div>
-        
-        <div className="input-group" style={{ marginTop: '0.5rem' }}>
-          <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            Face Limit: {parameters.face_limit ? parameters.face_limit.toLocaleString() : 'Auto'}
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <input
-              type="range"
-              min="1000"
-              max="100000"
-              step="1000"
-              value={parameters.face_limit || 10000}
-              onChange={(e) => onParametersChange({
-                ...parameters,
-                face_limit: parseInt(e.target.value, 10)
-              })}
-              disabled={isGenerating}
-              style={{ flex: 1 }}
-            />
-            <button
-              className="btn-icon"
-              onClick={() => onParametersChange({
-                ...parameters,
-                face_limit: undefined
-              })}
-              disabled={isGenerating}
-              style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
-              title="Reset to Auto"
-            >
-              Auto
-            </button>
-          </div>
-        </div>
-        
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-          Base generation: {CREDIT_COSTS.base} credits • Selected options: +{calculateTotalCost() - CREDIT_COSTS.base} credits
-        </div>
+        )}
       </div>
     </div>
   );

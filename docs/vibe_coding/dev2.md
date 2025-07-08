@@ -1,0 +1,6 @@
+In the current codebase I have already developed a minimal image-to-3d application (also with text2image support) upon Tripo API. Now I need you to add another API provider support `Replicate`. So that the user can switch between different API providers like Tripo and Replicate. 
+1. Replicate also needs setting up an API Key (should also be configured in the settings panel)
+2. Refer to @example_replicate_text2imahge.sh @example_replicate_image2model.sh for examples using replicate to send text2image and image-to-model requests, check the examples for input / output specifications
+3. As you may already have seen on the API example, replicate image2model interface you SHOULD ONLY provide 2 advanced parameters: (1) texture_size: [512, 2048], (2) mesh_simplify: [0.5, 0.95].
+4. Official replicate node.js doc: https://replicate.com/docs/get-started/nodejs
+Notice that different API providers can have different advanced parameters supported. You code should be scalable and extensible and SHOUDN'T affect original tripo API logic.

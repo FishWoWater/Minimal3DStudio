@@ -1,3 +1,5 @@
+export type APIProvider = 'tripo' | 'replicate';
+
 export interface GenerationParameters {
   texture: boolean;
   texture_quality: 'standard' | 'detailed';
@@ -6,6 +8,9 @@ export interface GenerationParameters {
   quad: boolean;
   face_limit?: number;
   pbr: boolean;
+  // Replicate-specific parameters
+  texture_size?: number; // 512-2048
+  mesh_simplify?: number; // 0.5-0.95
 }
 
 export interface UploadResponse {
@@ -113,4 +118,7 @@ export interface AppState {
   apiKey: string;
   error: string | null;
   isSettingsOpen: boolean;
+  // New provider-related state
+  apiProvider: APIProvider;
+  replicateApiKey: string;
 } 

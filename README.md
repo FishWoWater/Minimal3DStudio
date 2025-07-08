@@ -2,36 +2,46 @@
 
 **English** | [中文](README_zh.md)
 
-A minimal cross-platform(Win/Mac/Web) application for 3D model generation. Built with Tripo3D API, React, TypeScript, Three.js, and Electron.
-(~6 hours of vibe coding using Cursor + Claude4 in the weekend)
+A minimal cross-platform(Win/Mac/Web) application for 3D model generation. Built with React, TypeScript, Three.js, and Electron. Support Tripo and Replicate as the API providers. 
 
-> You can get 300 free API credits(separated from 300 web credits) upon registration on Tripo so it worths a try!
 
 ![Demo](./assets/demo.gif)
 
+## API Providers 
+### Tripo
+[Tripo]() is one of the best 3DAIGC providers. You can get 600 free API credits (separated from web credits) upon registration on Tripo so it worths a try! Beyond 600 credits, each image generation costs around $0.05, each model generation costs around $0.2.
+
+
+### Replicate 
+Current [Replicate](https://replicate.com) API builts upon  [Flux-Schnell](https://replicate.com/black-forest-labs/flux-schnell) for text2image generation and [TRELLIS](https://replicate.com/firtoz/trellis) for image2model generation. Replicate is in a pay-as-you-go way, which costs about $0.01 per text2image generation and $0.04 per imageTo3D model.
 
 ## Features
 
 ### 🎨 TextTo3d & ImageTo3D
 - **Text-to-Image**: Generate images from text prompts
 - **Image-to-3D**: Convert 2D images into 3D models
-- **Advanced Parameters**: Fine-tune generation with texture quality, topology options, and more
 
-### ⚙️ **Advanced Parameters**
+### ⚙️ **Replicate Advanced Parameters** 
+- **Texture Size**: texture resolution, [256, 2048]
+- **Simplify Ratio**: decimation ratio for the final geometry (0.5 - 0.95, largest value means fewer faces)
+
+
+### ⚙️ **Tripo Advanced Parameters**
 > check out the [Tripo Pricing Page](https://platform.tripo3d.ai/docs/billing) for the credits required.
-- **Generate Texture** : Adds realistic textures
+- **Generate Texture**: Generate textured mesh or raw mesh
 - **PBR Texture**: Generate PBR texture
-- **HD Texture** : High-definition texture quality
-- **Generate In Parts** : Segmented model components
-- **Low Poly** : Optimized geometry for gaming/AR
-- **Quad Topology** : Clean quad-based mesh
-- **Face Limit** : Limit the number of faces in the generated mesh.
+- **HD Texture**: High-Quality texture
+- **Generate In Parts**: Generate Part-Level Geometries (conflicts with texture generation)
+- **Low Poly**: Generate the model in a low-poly style
+- **Quad Topology**: Generate the geometry as a quad mesh instead of a triangle mesh
+- **Face Limit**: Limitation on the number of faces of generated geometry
 
 ## Quick Start
 
 ### Prerequisites
 - Node.js 16 or higher & npm
 - Tripo3D API key (get one at [platform.tripo3d.ai](https://platform.tripo3d.ai))
+- Replicate API key (get one at [Replicate API](https://replicate.com/account/api-tokens))
 
 ### Installation
 
@@ -45,8 +55,8 @@ A minimal cross-platform(Win/Mac/Web) application for 3D model generation. Built
    npm install
    ```
 3. **Configure API Key**
-   - In development, replace `api-key'` in `src/App.tsx` with your actual Tripo3D API key
-   - For production, use environment variables, or set the envar in settings panel
+   - In development, use environment variables to configure your API key `cp .env.example .env`.
+   - For production, check out the settings panel.
 4. **Start development server**
    ```bash
    npm start
@@ -67,8 +77,6 @@ npm run build
 npm run electron-pack
 # Package as desktop app (development - no code signing)
 npm run electron-pack-dev
-# Run tests
-npm test
 ```
 
 
@@ -77,7 +85,6 @@ npm test
 minimal_3d_studio/
 ├── public/
 │   ├── electron.js          # Electron main process
-│   │   └── ui-prototype.html    # Original UI prototype
 ├── src/
 │   ├── components/          # React components
 │   │   ├── Header.tsx
@@ -116,20 +123,8 @@ npm run electron-pack-dev -- --win
 npm run electron-pack-dev -- --linux
 ```
 
-#### For Production/Distribution
-```bash
-# Current platform (requires valid code signing certificates)
-npm run electron-pack
-# Specific platforms
-npm run electron-pack -- --win
-npm run electron-pack -- --mac
-npm run electron-pack -- --linux
-```
-
-> **Note**: For macOS distribution, you'll need valid Apple Developer certificates. For development builds, use the `electron-pack-dev` script to skip code signing.
-
 ### TODO
-- [ ] Support other API providers like piapi/fal.ai
+- [ ] Support other API providers like Replicate/Hunyuan
 - [ ] Support local API backend with [3DAIGC-Backend](https://github.com/FishWoWater/3DAIGC-API), and develop a more comprehensive 3D studio (including rigging/segmentation etc.).
 
 

@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { TaskSubmissionRequest, TaskSubmissionResponse, TaskStatusResponse, UserBalanceResponse, APIError, TaskStatus, GenerationParameters, UploadResponse } from '../types/api';
+import Replicate from 'replicate';
 
 const API_BASE_URL = 'https://api.tripo3d.ai/v2/openapi';
 
@@ -8,12 +9,27 @@ const isElectron = () => {
   return typeof window !== 'undefined' && window.navigator && window.navigator.userAgent && window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
 };
 
+// Abstract interface for API services
+export interface APIServiceInterface {
+  updateApiKey(apiKey: string): void;
+  getUserBalance(): Promise<UserBalanceResponse>;
+  uploadImage(file: File): Promise<string>;
+  generateImageToModel(imageSource: string, parameters: GenerationParameters, isUrl?: boolean): Promise<string>;
+  generateTextToImage(prompt: string): Promise<string>;
+  getTaskStatus(taskId: string): Promise<TaskStatusResponse>;
+  pollTaskStatus(
+    taskId: string,
+    onUpdate: (status: TaskStatus) => void,
+    onError: (error: APIError) => void
+  ): Promise<void>;
+}
+
 /**
  * Tripo3D API Service
  * 
  * Enhanced for Electron production environment with proper network configuration
  */
-class TripoAPIService {
+class TripoAPIService implements APIServiceInterface {
   private apiKey: string;
 
   constructor(apiKey: string) {
@@ -211,4 +227,258 @@ class TripoAPIService {
   }
 }
 
-export default TripoAPIService; 
+/**
+ * Replicate API Service
+ * 
+ * Implements the same interface as TripoAPIService for consistent usage
+ */
+class ReplicateAPIService implements APIServiceInterface {
+  private apiKey: string;
+  private replicate: Replicate;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+    this.replicate = new Replicate({
+      auth: apiKey,
+    });
+  }
+
+  updateApiKey(apiKey: string) {
+    this.apiKey = apiKey;
+    this.replicate = new Replicate({
+      auth: apiKey,
+    });
+  }
+
+  private handleError(error: any): APIError {
+    console.error('Replicate API Error:', error);
+    
+    return {
+      code: error.status || 500,
+      message: error.message || 'Replicate API request failed',
+      details: error.detail || error.toString(),
+    };
+  }
+
+  async getUserBalance(): Promise<UserBalanceResponse> {
+    // Replicate doesn't have a balance API, return a mock response
+    return {
+      code: 200,
+      data: {
+        balance: 999, // Mock balance
+        frozen: 0,
+      },
+    };
+  }
+
+  async uploadImage(file: File): Promise<string> {
+    // For Replicate, we return a special marker since we don't upload
+    // The actual file will be handled in generateImageToModel
+    return Promise.resolve('replicate-file-ready');
+  }
+
+  async generateImageToModel(imageSource: string, parameters: GenerationParameters, isUrl: boolean = false): Promise<string> {
+    try {
+      let imageData: string;
+      
+      if (isUrl || imageSource.startsWith('http')) {
+        // Use URL directly
+        imageData = imageSource;
+      } else if (imageSource === 'replicate-file-ready') {
+        // This means we need to get the file from the app state
+        throw new Error('File should be passed directly to Replicate generateImageToModel');
+      } else {
+        // Assume it's a data URL
+        imageData = imageSource;
+      }
+
+      // Extract Replicate-specific parameters with defaults
+      const replicateParams = {
+        images: [imageData],
+        texture_size: parameters.texture_size || 1024,
+        mesh_simplify: parameters.mesh_simplify || 0.9,
+        generate_model: true,
+        save_gaussian_ply: true,
+      };
+
+      console.log('Replicate image2Model request', replicateParams);
+
+      const prediction = await this.replicate.predictions.create({
+        version: "firtoz/trellis:e8f6c45206993f297372f5436b90350817bd9b4a0d52d2a76df50c1c8afa2b3c",
+        input: replicateParams,
+      });
+
+      console.log('Replicate image2Model response', prediction);
+      return prediction.id;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // New method to handle file directly
+  async generateImageToModelFromFile(file: File, parameters: GenerationParameters): Promise<string> {
+    try {
+      // Convert file to data URL for Replicate
+      const imageData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+
+      // Extract Replicate-specific parameters with defaults
+      const replicateParams = {
+        images: [imageData],
+        texture_size: parameters.texture_size || 1024,
+        mesh_simplify: parameters.mesh_simplify || 0.9,
+        generate_model: true,
+        save_gaussian_ply: true,
+      };
+
+      console.log('Replicate image2Model request from file', replicateParams);
+
+      const prediction = await this.replicate.predictions.create({
+        version: "firtoz/trellis:e8f6c45206993f297372f5436b90350817bd9b4a0d52d2a76df50c1c8afa2b3c",
+        input: replicateParams,
+      });
+
+      console.log('Replicate image2Model response', prediction);
+      return prediction.id;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async generateTextToImage(prompt: string): Promise<string> {
+    try {
+      const prediction = await this.replicate.predictions.create({
+        version: "black-forest-labs/flux-schnell",
+        input: { prompt },
+      });
+
+      return prediction.id;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+    try {
+      const prediction = await this.replicate.predictions.get(taskId);
+      
+      // Convert Replicate response to our standard format
+      const status: TaskStatus = {
+        task_id: prediction.id,
+        type: (prediction.input as any)?.images ? 'image_to_model' : 'text_to_image',
+        status: this.mapReplicateStatus(prediction.status),
+        input: prediction.input,
+        output: this.mapReplicateOutput(prediction.output),
+        progress: this.calculateProgress(prediction.status),
+        create_time: new Date(prediction.created_at).getTime(),
+      };
+
+      return {
+        code: 200,
+        data: status,
+      };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  private mapReplicateStatus(status: string): TaskStatus['status'] {
+    switch (status) {
+      case 'starting':
+      case 'processing':
+        return 'running';
+      case 'succeeded':
+        return 'success';
+      case 'failed':
+        return 'failed';
+      case 'canceled':
+        return 'cancelled';
+      default:
+        return 'queued';
+    }
+  }
+
+  private mapReplicateOutput(output: any) {
+    if (!output) return {};
+    
+    // Handle different output formats
+    if (Array.isArray(output)) {
+      // Text-to-image typically returns an array of URLs
+      return { generated_image: output[0] };
+    } else if (typeof output === 'object') {
+      // Image-to-model returns an object with model_file
+      return { 
+        model: output.model_file,
+        base_model: output.model_file,
+        pbr_model: output.model_file,
+      };
+    }
+    
+    return {};
+  }
+
+  private calculateProgress(status: string): number {
+    switch (status) {
+      case 'starting':
+        return 10;
+      case 'processing':
+        return 50;
+      case 'succeeded':
+        return 100;
+      case 'failed':
+      case 'canceled':
+        return 0;
+      default:
+        return 0;
+    }
+  }
+
+  async pollTaskStatus(
+    taskId: string,
+    onUpdate: (status: TaskStatus) => void,
+    onError: (error: APIError) => void
+  ): Promise<void> {
+    const poll = async () => {
+      try {
+        const response = await this.getTaskStatus(taskId);
+        const status = response.data;
+        
+        onUpdate(status);
+        
+        if (status.status === 'queued' || status.status === 'running') {
+          setTimeout(poll, 3000); // Poll every 3 seconds (Replicate is slower)
+        }
+      } catch (error) {
+        console.error('Error polling Replicate task status:', error);
+        onError(error as APIError);
+      }
+    };
+
+    poll();
+  }
+
+  // Validate API key format
+  static isValidApiKey(apiKey: string): boolean {
+    // Replicate API keys start with "r8_"
+    return apiKey.length > 10 && apiKey.startsWith('r8_');
+  }
+}
+
+// Factory function to create the appropriate API service
+export function createAPIService(provider: 'tripo' | 'replicate', apiKey: string): APIServiceInterface {
+  switch (provider) {
+    case 'tripo':
+      return new TripoAPIService(apiKey);
+    case 'replicate':
+      return new ReplicateAPIService(apiKey);
+    default:
+      throw new Error(`Unsupported API provider: ${provider}`);
+  }
+}
+
+export default TripoAPIService;
+export { ReplicateAPIService }; 

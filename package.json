@@ -1,8 +1,8 @@
 {
   "name": "minimal_3d_studio",
-  "author": "FishWoWater", 
+  "author": "FishWoWater",
   "description": "A minimal 3D studio for 3D generative models.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "public/electron.js",
   "homepage": ".",
@@ -20,6 +20,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-scripts": "5.0.1",
+    "replicate": "^1.0.1",
     "three": "^0.178.0",
     "web-vitals": "^2.1.4"
   },

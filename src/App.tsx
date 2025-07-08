@@ -4,8 +4,8 @@ import { ImageViewport } from './components/ImageViewport';
 import { ModelViewport } from './components/ModelViewport';
 import { ControlPanel } from './components/ControlPanel';
 import { SettingsModal } from './components/SettingsModal';
-import { GenerationParameters, TaskStatus, AppState, APIError } from './types/api';
-import TripoAPIService from './services/api';
+import { GenerationParameters, TaskStatus, AppState, APIError, APIProvider } from './types/api';
+import { createAPIService, APIServiceInterface } from './services/api';
 import './App.css';
 
 const defaultParameters: GenerationParameters = {
@@ -16,14 +16,20 @@ const defaultParameters: GenerationParameters = {
   quad: false,
   face_limit: undefined,
   pbr: false,
+  // Replicate defaults
+  texture_size: 1024,
+  mesh_simplify: 0.9,
 };
 
-// Development API key provided by user
-const DEVELOPMENT_API_KEY = 'you-tripo-api-key';
+// Development API keys from environment variables
+const DEVELOPMENT_TRIPO_API_KEY = process.env.REACT_APP_TRIPO_API_KEY || '';
+const DEVELOPMENT_REPLICATE_API_KEY = process.env.REACT_APP_REPLICATE_API_KEY || '';
 
 // Local storage keys
 const STORAGE_KEYS = {
   API_KEY: 'tripo_api_key',
+  REPLICATE_API_KEY: 'replicate_api_key',
+  API_PROVIDER: 'api_provider',
   THEME: 'app_theme',
   PARAMETERS: 'generation_parameters',
 };
@@ -34,51 +40,61 @@ function App() {
     selectedImageUrl: null,
     imageToken: null,
     textPrompt: '',
-    generationParameters: {
-      texture: true,
-      texture_quality: 'standard',
-      generate_parts: false,
-      smart_low_poly: false,
-      quad: false,
-      face_limit: 20000,
-      pbr: false,
-    },
+    generationParameters: defaultParameters,
     currentTask: null,
     isGenerating: false,
     credits: 0,
     viewMode: 'rendered',
     generatedModel: null,
     theme: 'dark',
-    apiKey: localStorage.getItem('tripo_api_key') || DEVELOPMENT_API_KEY,
+    apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || DEVELOPMENT_TRIPO_API_KEY,
+    replicateApiKey: localStorage.getItem(STORAGE_KEYS.REPLICATE_API_KEY) || DEVELOPMENT_REPLICATE_API_KEY,
+    apiProvider: (localStorage.getItem(STORAGE_KEYS.API_PROVIDER) as APIProvider) || 'tripo',
     error: null,
     isSettingsOpen: false,
   });
 
-  const [apiService, setApiService] = useState(() => new TripoAPIService(DEVELOPMENT_API_KEY));
+  const [apiService, setApiService] = useState<APIServiceInterface>(() => {
+    const provider = (localStorage.getItem(STORAGE_KEYS.API_PROVIDER) as APIProvider) || 'tripo';
+    const apiKey = provider === 'tripo' 
+      ? localStorage.getItem(STORAGE_KEYS.API_KEY) || DEVELOPMENT_TRIPO_API_KEY
+      : localStorage.getItem(STORAGE_KEYS.REPLICATE_API_KEY) || DEVELOPMENT_REPLICATE_API_KEY;
+    return createAPIService(provider, apiKey);
+  });
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
 
   // Load saved settings on mount
   useEffect(() => {
     const savedApiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
+    const savedReplicateApiKey = localStorage.getItem(STORAGE_KEYS.REPLICATE_API_KEY);
+    const savedApiProvider = localStorage.getItem(STORAGE_KEYS.API_PROVIDER) as APIProvider;
     const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) as 'dark' | 'light';
     const savedParameters = localStorage.getItem(STORAGE_KEYS.PARAMETERS);
 
     setState(prev => ({
       ...prev,
-      apiKey: savedApiKey || DEVELOPMENT_API_KEY,
+      apiKey: savedApiKey || DEVELOPMENT_TRIPO_API_KEY,
+      replicateApiKey: savedReplicateApiKey || DEVELOPMENT_REPLICATE_API_KEY,
+      apiProvider: savedApiProvider || 'tripo',
       theme: savedTheme || 'dark',
-      generationParameters: savedParameters ? JSON.parse(savedParameters) : defaultParameters,
+      generationParameters: savedParameters ? { ...defaultParameters, ...JSON.parse(savedParameters) } : defaultParameters,
     }));
 
-    // Update API service if saved API key exists
-    if (savedApiKey) {
-      const service = new TripoAPIService(savedApiKey);
+    // Create appropriate API service
+    const provider = savedApiProvider || 'tripo';
+    const apiKey = provider === 'tripo' 
+      ? savedApiKey || DEVELOPMENT_TRIPO_API_KEY
+      : savedReplicateApiKey || DEVELOPMENT_REPLICATE_API_KEY;
+    
+    if (apiKey) {
+      const service = createAPIService(provider, apiKey);
       setApiService(service);
-      fetchCredits(service);
-    } else {
-      // Use development API key and fetch credits
-      fetchCredits(apiService);
+      // Only fetch credits for Tripo provider
+      if (provider === 'tripo') {
+        fetchCredits(service);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Apply theme to document
@@ -92,7 +108,7 @@ function App() {
     localStorage.setItem(STORAGE_KEYS.PARAMETERS, JSON.stringify(state.generationParameters));
   }, [state.generationParameters]);
 
-  const fetchCredits = useCallback(async (service: TripoAPIService, retryCount = 0) => {
+  const fetchCredits = useCallback(async (service: APIServiceInterface, retryCount = 0) => {
     setIsLoadingCredits(true);
     try {
       const balanceResponse = await service.getUserBalance();
@@ -125,13 +141,41 @@ function App() {
     setState(prev => ({ ...prev, apiKey: newApiKey }));
     localStorage.setItem(STORAGE_KEYS.API_KEY, newApiKey);
     
-    // Update API service
-    const newService = new TripoAPIService(newApiKey);
-    setApiService(newService);
+    // Update API service if current provider is Tripo
+    if (state.apiProvider === 'tripo') {
+      const newService = createAPIService('tripo', newApiKey);
+      setApiService(newService);
+      fetchCredits(newService);
+    }
+  }, [state.apiProvider, fetchCredits]);
+
+  const handleReplicateApiKeyChange = useCallback((newApiKey: string) => {
+    setState(prev => ({ ...prev, replicateApiKey: newApiKey }));
+    localStorage.setItem(STORAGE_KEYS.REPLICATE_API_KEY, newApiKey);
     
-    // Fetch credits with new API key
-    fetchCredits(newService);
-  }, [fetchCredits]);
+    // Update API service if current provider is Replicate
+    if (state.apiProvider === 'replicate') {
+      const newService = createAPIService('replicate', newApiKey);
+      setApiService(newService);
+      // Don't fetch credits for Replicate
+    }
+  }, [state.apiProvider]);
+
+  const handleApiProviderChange = useCallback((newProvider: APIProvider) => {
+    setState(prev => ({ ...prev, apiProvider: newProvider }));
+    localStorage.setItem(STORAGE_KEYS.API_PROVIDER, newProvider);
+    
+    // Switch API service
+    const apiKey = newProvider === 'tripo' ? state.apiKey : state.replicateApiKey;
+    if (apiKey) {
+      const newService = createAPIService(newProvider, apiKey);
+      setApiService(newService);
+      // Only fetch credits for Tripo
+      if (newProvider === 'tripo') {
+        fetchCredits(newService);
+      }
+    }
+  }, [state.apiKey, state.replicateApiKey, fetchCredits]);
 
   const handleSettingsSave = useCallback(() => {
     // Settings are automatically saved via other handlers
@@ -148,21 +192,29 @@ function App() {
       error: null,
     }));
 
-    // Upload the image to get the token
-    try {
-      const imageToken = await apiService.uploadImage(file);
+    // Only upload image for Tripo provider
+    if (state.apiProvider === 'tripo') {
+      try {
+        const imageToken = await apiService.uploadImage(file);
+        setState(prev => ({
+          ...prev,
+          imageToken: imageToken,
+        }));
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        setState(prev => ({
+          ...prev,
+          error: 'Failed to upload image. Please try again.',
+        }));
+      }
+    } else {
+      // For Replicate, store the file directly
       setState(prev => ({
         ...prev,
-        imageToken: imageToken,
-      }));
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      setState(prev => ({
-        ...prev,
-        error: 'Failed to upload image. Please try again.',
+        imageToken: 'replicate-file-ready', // Flag to indicate file is ready
       }));
     }
-  }, [apiService]);
+  }, [apiService, state.apiProvider]);
 
   const handleTextPromptChange = useCallback((prompt: string) => {
     setState(prev => ({
@@ -218,8 +270,10 @@ function App() {
               isGenerating: false, // Reset generating state
               currentTask: status,
             }));
-            // Refresh credits after successful generation
-            fetchCredits(apiService);
+            // Refresh credits after successful generation (only for Tripo)
+            if (state.apiProvider === 'tripo') {
+              fetchCredits(apiService);
+            }
           } else if (status.status === 'failed') {
             setState(prev => ({ 
               ...prev, 
@@ -248,7 +302,7 @@ function App() {
     } catch (error) {
       handleError(error as APIError);
     }
-  }, [state.textPrompt, apiService, fetchCredits]);
+  }, [state.textPrompt, state.apiProvider, apiService, fetchCredits, handleError]);
 
   const handleGenerate3DModel = useCallback(async () => {
     // Check if we have either an image token (uploaded image) or image URL (generated image)
@@ -263,11 +317,33 @@ function App() {
     setState(prev => ({ ...prev, isGenerating: true, error: null, currentTask: null }));
 
     try {
-      const taskId = await apiService.generateImageToModel(
-        state.imageToken || state.selectedImageUrl!, // Use token if available, otherwise use URL
-        state.generationParameters,
-        !state.imageToken // If no token, then we're using a URL
-      );
+      let taskId: string;
+
+      if (state.apiProvider === 'replicate') {
+        // For Replicate, handle file vs URL differently
+        if (state.selectedImage && state.imageToken === 'replicate-file-ready') {
+          // Use file directly for Replicate
+          const replicateService = apiService as any; // Type assertion to access generateImageToModelFromFile
+          taskId = await replicateService.generateImageToModelFromFile(state.selectedImage, state.generationParameters);
+        } else if (state.selectedImageUrl) {
+          // Use URL for generated images
+          taskId = await apiService.generateImageToModel(
+            state.selectedImageUrl,
+            state.generationParameters,
+            true // isUrl = true
+          );
+        } else {
+          throw new Error('No valid image source for Replicate');
+        }
+      } else {
+        // Original Tripo logic
+        taskId = await apiService.generateImageToModel(
+          state.imageToken || state.selectedImageUrl!, // Use token if available, otherwise use URL
+          state.generationParameters,
+          !state.imageToken // If no token, then we're using a URL
+        );
+      }
+
       console.log('image2Model taskId', taskId);
       
       apiService.pollTaskStatus(
@@ -278,8 +354,6 @@ function App() {
             currentTask: status,
           }));
 
-          // console.log('image2Model status', status);
-
           if (status.status === 'success' && (status.output.pbr_model || status.output.model || status.output.base_model)) {
             // Priority order: pbr_model -> model -> base_model
             const modelUrl = status.output.pbr_model || status.output.model || status.output.base_model;
@@ -289,8 +363,10 @@ function App() {
               isGenerating: false, // Reset generating state
               currentTask: status,
             }));
-            // Refresh credits after successful generation
-            fetchCredits(apiService);
+            // Refresh credits after successful generation (only for Tripo)
+            if (state.apiProvider === 'tripo') {
+              fetchCredits(apiService);
+            }
           } else if (status.status === 'failed') {
             setState(prev => ({ 
               ...prev, 
@@ -319,7 +395,7 @@ function App() {
     } catch (error) {
       handleError(error as APIError);
     }
-  }, [state.imageToken, state.selectedImageUrl, state.generationParameters, apiService, fetchCredits]);
+  }, [state.imageToken, state.selectedImageUrl, state.selectedImage, state.generationParameters, state.apiProvider, apiService, fetchCredits, handleError]);
 
   const handleViewModeChange = useCallback((mode: '3d' | 'wireframe' | 'rendered') => {
     setState(prev => ({
@@ -363,6 +439,7 @@ function App() {
         onThemeToggle={handleThemeToggle}
         onSettingsClick={handleSettingsOpen}
         isLoadingCredits={isLoadingCredits}
+        apiProvider={state.apiProvider}
       />
       
       <main className="main-content">
@@ -374,7 +451,6 @@ function App() {
         
         <ModelViewport
           modelUrl={state.generatedModel}
-          // modelUrl="https://tripo-data.rg1.data.tripo3d.com/tcli_a3babff9fddb49bdbd9df34f9044ec96/20250705/6e13a1d3-701f-40e0-ac12-d2e1fdd6b6db/tripo_pbr_model_6e13a1d3-701f-40e0-ac12-d2e1fdd6b6db.glb?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfYTNiYWJmZjlmZGRiNDliZGJkOWRmMzRmOTA0NGVjOTYvMjAyNTA3MDUvNmUxM2ExZDMtNzAxZi00MGUwLWFjMTItZDJlMWZkZDZiNmRiL3RyaXBvX3Bicl9tb2RlbF82ZTEzYTFkMy03MDFmLTQwZTAtYWMxMi1kMmUxZmRkNmI2ZGIuZ2xiIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzUxNzYwMDAwfX19XX0_&Signature=e7QWreKvxGmKK5UZs4xjQ7KsXMmaRoopQ6WpViCmQnIYqBETh5OjVXh-MXcRIk7TKREk3e-7817m1sey8i5g6f8W9r8-Lsh2NhbxggB~od-GvS4qKl5oFQFiP0LbRV2RHHTQfSxc75vC0Kys26xaSGJ4heTixW7~OChBniV-QgC2lfGmJLXHqKeWonHBKbVKs5CzaD~cgd-~tLRr0Kc-y2DntUJsySgAHlft5nN5VALByHmdVNwBQvRFKNXmAh7fWQALz6tEaEkujW3Z6Z-vEruWLNXewwFSJq5V2N2z8oIQa-zflEKe61ZolwQPABDG1NgtD~x7cCFEg3eD-jLyew__&Key-Pair-Id=K1676C64NMVM2J"
           viewMode={state.viewMode}
           onViewModeChange={handleViewModeChange}
           isGenerating={state.isGenerating && state.currentTask?.type === 'image_to_model'}
@@ -395,6 +471,7 @@ function App() {
         hasModel={!!state.generatedModel}
         error={state.error}
         onClearError={handleClearError}
+        apiProvider={state.apiProvider}
       />
 
       <SettingsModal
@@ -402,6 +479,10 @@ function App() {
         onClose={handleSettingsClose}
         apiKey={state.apiKey}
         onApiKeyChange={handleApiKeyChange}
+        replicateApiKey={state.replicateApiKey}
+        onReplicateApiKeyChange={handleReplicateApiKeyChange}
+        apiProvider={state.apiProvider}
+        onApiProviderChange={handleApiProviderChange}
         onSave={handleSettingsSave}
       />
     </div>
