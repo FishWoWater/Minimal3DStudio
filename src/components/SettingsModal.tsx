@@ -181,10 +181,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <h3>About</h3>
             <div className="setting-item">
               <p className="about-text">
-                Minimal 3D Studio v0.2.0<br />
-                AI-powered 3D model generation tool<br />
-                Built with React, Three.js, and Electron<br />
-                Supporting Tripo3D and Replicate APIs
+                Minimal 3D Studio v0.2.0
               </p>
             </div>
           </div>

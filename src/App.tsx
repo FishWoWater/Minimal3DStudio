@@ -47,8 +47,8 @@ function App() {
     viewMode: 'rendered',
     generatedModel: null,
     theme: 'dark',
-    apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || DEVELOPMENT_TRIPO_API_KEY,
-    replicateApiKey: localStorage.getItem(STORAGE_KEYS.REPLICATE_API_KEY) || DEVELOPMENT_REPLICATE_API_KEY,
+    apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || '', // TODO: replace the latter with your development key above
+    replicateApiKey: localStorage.getItem(STORAGE_KEYS.REPLICATE_API_KEY) || '', // TODO: replace the latter with your development key above
     apiProvider: (localStorage.getItem(STORAGE_KEYS.API_PROVIDER) as APIProvider) || 'tripo',
     error: null,
     isSettingsOpen: false,

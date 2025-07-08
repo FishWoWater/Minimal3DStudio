@@ -13,7 +13,7 @@
 [Tripo](https://www.tripo3d.ai) 是最好的3D AI生成内容提供商之一。注册Tripo即可获得600个免费API积分（与网页版积分分开计算），非常值得一试！超过600积分后，每次图像生成大约需要0.05美元，每次模型生成大约需要0.2美元。
 
 ### Replicate
-目前 [Replicate](https://replicate.com) API基于 [Flux-Schnell](https://replicate.com/black-forest-labs/flux-schnell) 进行文本生成图像，使用 [TRELLIS](https://replicate.com/firtoz/trellis) 进行图像生成3D模型。Replicate采用按使用量付费的方式，每次文本生成图像大约需要0.01美元，每次图像生成3D模型大约需要0.04美元。
+目前 [Replicate](https://replicate.com) API基于 [Flux-Schnell](https://replicate.com/black-forest-labs/flux-schnell) 进行文本生成图像，使用 [TRELLIS](https://replicate.com/firtoz/trellis) 进行图像生成3D模型。Replicate采用按使用量付费的方式，每次文本生成图像大约需要0.003美元，每次图像生成3D模型大约需要0.04美元。
 
 ## 功能特性
 
@@ -22,8 +22,8 @@
 - **图像转3D**：将2D图像转换为3D模型
 
 ### ⚙️ **Replicate 高级参数**
-- **贴图大小**: 纹理分辨率，范围[256, 2048]
-- **简化比例**: 最终几何体的简化比例（0.5-0.95，数值越大面数越少）
+- **贴图大小**: 纹理分辨率，范围[512, 2048]
+- **简化比例**: 最终几何体的简化比例（0.9-0.99，数值越大面数越少）
 
 ### ⚙️ **Tripo 高级参数**
 > 查看 [Tripo 定价页面](https://platform.tripo3d.ai/docs/billing) 了解所需积分。
@@ -78,8 +78,6 @@ npm run build
 npm run electron-pack
 # 打包为桌面应用（开发版本 - 无代码签名）
 npm run electron-pack-dev
-# 运行测试
-npm test
 ```
 
 

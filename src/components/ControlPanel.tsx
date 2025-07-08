@@ -223,9 +223,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </label>
         <input
           type="range"
-          min="0.5"
-          max="0.95"
-          step="0.05"
+          min="0.9"
+          max="0.99"
+          step="0.01"
           value={parameters.mesh_simplify || 0.9}
           onChange={(e) => onParametersChange({
             ...parameters,
@@ -371,7 +371,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="replicate-parameters">
             {renderReplicateParameters()}
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-              Replicate API - pay per generation(around $0.01 per text2image and $0.04 per image2model)
+              Replicate API - pay per generation(around $0.003 per text2image and $0.04 per image2model)
             </div>
           </div>
         )}

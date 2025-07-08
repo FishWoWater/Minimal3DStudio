@@ -10,7 +10,7 @@ export interface GenerationParameters {
   pbr: boolean;
   // Replicate-specific parameters
   texture_size?: number; // 512-2048
-  mesh_simplify?: number; // 0.5-0.95
+  mesh_simplify?: number; // 0.9-0.95
 }
 
 export interface UploadResponse {

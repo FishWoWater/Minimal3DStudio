@@ -2,18 +2,18 @@
 
 **English** | [中文](README_zh.md)
 
-A minimal cross-platform(Win/Mac/Web) application for 3D model generation. Built with React, TypeScript, Three.js, and Electron. Support Tripo and Replicate as the API providers. 
+A minimal cross-platform(Win/Mac/Web) application for 3D model generation. Built with React, TypeScript, Three.js, and Electron. **Support Tripo and Replicate as the API providers.** 
 
 
 ![Demo](./assets/demo.gif)
 
 ## API Providers 
 ### Tripo
-[Tripo]() is one of the best 3DAIGC providers. You can get 600 free API credits (separated from web credits) upon registration on Tripo so it worths a try! Beyond 600 credits, each image generation costs around $0.05, each model generation costs around $0.2.
+[Tripo](https://www.tripo3d.ai) is one of the best 3DAIGC providers. You can get 600 free API credits (separated from web credits) upon registration on Tripo so it worths a try! Beyond 600 credits, each image generation costs around $0.05, each model generation costs around $0.2.
 
 
 ### Replicate 
-Current [Replicate](https://replicate.com) API builts upon  [Flux-Schnell](https://replicate.com/black-forest-labs/flux-schnell) for text2image generation and [TRELLIS](https://replicate.com/firtoz/trellis) for image2model generation. Replicate is in a pay-as-you-go way, which costs about $0.01 per text2image generation and $0.04 per imageTo3D model.
+Current [Replicate](https://replicate.com) API builts upon  [Flux-Schnell](https://replicate.com/black-forest-labs/flux-schnell) for text2image and [TRELLIS](https://replicate.com/firtoz/trellis) for image2model. Replicate is pay-as-you-go, which costs about $0.003 per text2image generation and $0.04 per image2model generation.
 
 ## Features
 
@@ -22,8 +22,8 @@ Current [Replicate](https://replicate.com) API builts upon  [Flux-Schnell](https
 - **Image-to-3D**: Convert 2D images into 3D models
 
 ### ⚙️ **Replicate Advanced Parameters** 
-- **Texture Size**: texture resolution, [256, 2048]
-- **Simplify Ratio**: decimation ratio for the final geometry (0.5 - 0.95, largest value means fewer faces)
+- **Texture Size**: texture resolution, [512, 2048]
+- **Simplify Ratio**: decimation ratio for the final geometry (0.9 - 0.99, largest value means fewer faces)
 
 
 ### ⚙️ **Tripo Advanced Parameters**
